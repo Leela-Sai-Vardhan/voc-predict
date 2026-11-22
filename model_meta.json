@@ -1,0 +1,1 @@
+{"features": ["peak_response", "response_time", "rise_rate", "tau_ad_1", "tau_ad_2"], "gases": ["acetone", "ethanol", "isopropanol", "methanol"]}

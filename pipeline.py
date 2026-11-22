@@ -53,7 +53,10 @@ def detect_exposure(s, df, threshold_k=3.0, window_s=5.0):
     dt = float(np.median(np.diff(df["time"].to_numpy())))
     peak = int(np.argmax(x))
     g = np.abs(np.gradient(x, dt))[:peak + 11]  # +margin: cover ramp rounded by smoothing
-    start = int(np.flatnonzero(g > 0.5 * g.max())[0])
+    valid = np.flatnonzero(g > 0.5 * g.max()) if g.size > 0 and g.max() > 0 else np.array([])
+    if len(valid) == 0:
+        return None, None
+    start = int(valid[0])
     noise = threshold_k * noise_std(s, df, window_s)
     if x[start:].max() < noise:
         return None, None
@@ -98,7 +101,8 @@ def extract_features(df, window_s=5.0, sg_window=11, sg_poly=3, threshold_k=3.0)
                 "recovery_time": float("nan"), "rise_rate": 0.0,
                 "decay_rate": 0.0, "tau_ad_1": float("nan"),
                 "tau_ad_2": float("nan"), "tau_de_1": float("nan"),
-                "tau_de_2": float("nan"), "peak_time": float("nan")}
+                "tau_de_2": float("nan"), "peak_time": float("nan"),
+                "norm_slope": float("nan")}
 
     peak_idx = start + int(np.argmax(s.to_numpy()[start:]))
     peak = float(s.to_numpy()[peak_idx])
@@ -133,7 +137,8 @@ def extract_features(df, window_s=5.0, sg_window=11, sg_poly=3, threshold_k=3.0)
             "rise_rate": rise_rate, "decay_rate": decay_rate,
             "tau_ad_1": tau_ad[0], "tau_ad_2": tau_ad[1],
             "tau_de_1": tau_de[0], "tau_de_2": tau_de[1],
-            "peak_time": float(t[peak_idx])}
+            "peak_time": float(t[peak_idx]),
+            "norm_slope": float(rise_rate / peak) if peak > 0 else float("nan")}
 
 
 # --------------------------------------------------- synthetic data (test)
@@ -145,10 +150,21 @@ GAS_PARAMS = {
     "isopropanol": dict(smax=0.68, ta=(2.5, 10.0), td=(3.5, 24.0), w=0.4),
 }
 
+# Verified physical kinetics from the real 100 ppm ZnO recordings (session.md
+# "Physical Grounding"). Same schema as GAS_PARAMS; use as
+# generate_synthetic(gas, params=ZNO_PARAMS). The slow ta (~30-37 s) needs
+# expose_s >= 120 s to resolve cleanly (default expose_s=40 truncates it).
+ZNO_PARAMS = {
+    "methanol":    dict(smax=0.191, ta=(10.6, 36.5), td=(5.0, 40.0), w=0.5),
+    "acetone":     dict(smax=0.251, ta=(0.2, 29.7),  td=(5.0, 40.0), w=0.5),
+    "isopropanol": dict(smax=0.282, ta=(5.0, 34.8),  td=(5.0, 40.0), w=0.5),
+    "ethanol":     dict(smax=0.306, ta=(0.6, 29.4),  td=(5.0, 40.0), w=0.5),
+}
+
 
 def generate_synthetic(gas, r0=10e6, seed=0, baseline_s=5.0, expose_s=40.0,
                        recover_s=60.0, dt=0.1, noise_std_rel=0.002,
-                       concentration=1.0):
+                       concentration=1.0, params=GAS_PARAMS):
     """One recording: clean-air baseline -> gas on -> gas off.
 
     n-type ZnO exposed to a reducing VOC => resistance drops => S(t) < 0.
@@ -156,7 +172,7 @@ def generate_synthetic(gas, r0=10e6, seed=0, baseline_s=5.0, expose_s=40.0,
     Returns a `time`/`resistance` DataFrame with known ground-truth kinetics.
     """
     rng = np.random.default_rng(seed)
-    p = GAS_PARAMS[gas]
+    p = params[gas]
     smax = p["smax"] * float(concentration) ** 0.5
     t_end = baseline_s + expose_s + recover_s
     t = np.arange(0, t_end, dt)

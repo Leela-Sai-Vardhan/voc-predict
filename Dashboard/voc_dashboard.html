@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOC-Predict — Master Dashboard</title>
+  <style>
+    /* ============ DARK ANALYTICS COLOR PALETTE ============ */
+    :root {
+      --bg-primary: #121212;        /* Deep Slate — absolute background */
+      --bg-secondary: #1E1E1E;      /* Charcoal — cards/surfaces */
+      --border-color: #2C2C2C;      /* Subtle dividers */
+      --text-primary: #E0E0E0;      /* Off-White — main labels */
+      --text-muted: #8A8A8A;        /* Ash Gray — axis labels */
+      --gas-ethanol: #FF7A00;       /* Neon Orange */
+      --gas-methanol: #00E676;      /* Acid Green */
+      --gas-acetone: #FF2A6D;       /* Magenta/Pink */
+      --gas-isopropanol: #05D9E8;   /* Electric Cyan */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    ul { list-style: none; }
+
+    /* ============ LAYOUT ============ */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Header */
+    .header {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      backdrop-filter: saturate(180%) blur(8px);
+    }
+
+    .header h1 {
+      font-size: 1.4rem;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    .header .version {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: 20px;
+    }
+
+    /* Main grid: left sidebar (20%) | center (60%) | right sidebar (20%) */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 200px 1fr 200px;
+      gap: 16px;
+    }
+
+    @media (max-width: 1600px) {
+      .main-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+    }
+
+    @media (max-width: 1000px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+
+    /* ============ CARDS ============ */
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+
+    .card h3 {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    /* ============ LEFT SIDEBAR: CONNECTION ============ */
+    .conn-card .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .conn-card .row label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .conn-card .row select {
+      flex: 1;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .conn-card .row button {
+      background: var(--gas-ethanol);
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .conn-card .button:hover { opacity: 0.9; }
+
+    /* ============ CENTER: KINETICS CHART ============ */
+    .chart-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* Simple canvas-based kinetics chart */
+    #kineticsCanvas {
+      display: block;
+      width: 100%;
+      height: 400px;
+      background: var(--bg-primary);
+    }
+
+    /* ============ RIGHT SIDEBAR: PREDICTION ============ */
+    .pred-card .probabilities {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .prob-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .prob-card .gas-name {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .prob-card .prob-bar {
+      height: 8px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .prob-card .prob-fill {
+      height: 100%;
+      background: var(--gas-ethanol); /* will be overridden per gas */
+      transition: width 0.3s ease;
+    }
+
+    .prob-card .prob-value {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.65rem;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ============ FEATURES TABLE ============ */
+    .features-table .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .features-table .row:last-child { border-bottom: none; }
+
+    .features-table .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .features-table .value {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+      font-size: 0.75rem;
+    }
+
+    /* ============ HARDWARE STATUS ============ */
+    .hw-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+    }
+
+    .hw-status.connected { background: rgba(16, 185, 129, 0.15); color: var(--gas-ethanol); }
+    .hw-status.disconnected { background: rgba(239, 68, 68, 0.15); color: var(--gas-methanol); }
+
+    /* ============ RESPONSIVE ============ */
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; gap: 12px; }
+      .probabilities { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>VOC-Predict</h1>
+      <div class="version">v1.2 — 4-Class XGBoost</div>
+    </header>
+
+    <main class="main-grid">
+
+      <!-- LEFT: Connection Card -->
+      <section class="card conn-card">
+        <div class="row">
+          <label>Serial Port</label>
+          <select id="portSelect">
+            <option>COM3</option>
+            <option>COM4</option>
+            <option>COM5</option>
+            <option>COM6</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Baud Rate</label>
+          <select id="baudSelect">
+            <option>9600</option>
+            <option>115200</option>
+            <option>57600</option>
+          </select>
+        </div>
+        <button class="button" id="connectBtn">CONNECT</button>
+        <div class="hw-status disconnected" id="statusTag">Disconnected</div>
+      </section>
+
+      <!-- CENTER: Kinetics Chart -->
+      <section class="card chart-card">
+        <h3 class="card-title" style="margin:0 0 12px 0;">KINETICS TRANSIENT</h3>
+        <canvas id="kineticsCanvas"></canvas>
+      </section>
+
+      <!-- RIGHT: Prediction + Features -->
+      <section class="card pred-card">
+        <div class="probabilities" id="probabilities">
+          <!-- Dynamically populated -->
+        </div>
+        <div class="features-table" id="featuresTable">
+          <div class="row">
+            <span class="label">peak_response</span>
+            <span class="value" id="peakResponse">—</span>
+          </div>
+          <div class="row">
+            <span class="label">response_time</span>
+            <span class="value" id="responseTime">—</span>
+          </div>
+          <div class="row">
+            <span class="label">rise_rate</span>
+            <span class="value" id="riseRate">—</span>
+          </div>
+          <div class="row">
+            <span class="label">tau_ad_1</span>
+            <span class="value" id="tauAd1">—</span>
+          </div>
+          <div class="row">
+            <span class="label">tau_ad_2</span>
+            <span class="value" id="tauAd2">—</span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    /* ============ CONFIG ============ */
+    const API_BASE = 'http://127.0.0.1:8000';
+    const GAS_COLORS = {
+      'ethanol': '#FF7A00',
+      'methanol': '#00E676',
+      'acetone': '#FF2A6D',
+      'isopropanol': '#05D9E8'
+    };
+
+    /* ============ ELEMENTS ============ */
+    const connectBtn = document.getElementById('connectBtn');
+    const statusTag = document.getElementById('statusTag');
+    const kineticsCanvas = document.getElementById('kineticsCanvas');
+    const ctx = kineticsCanvas.getContext('2d');
+    const probContainer = document.getElementById('probabilities');
+    const featuresTable = document.getElementById('featuresTable');
+
+    let ws = null;
+    let isConnected = false;
+    let dataInterval = null;
+    let points = 100; // number of data points to display
+    let xOffset = 0;
+
+    /* ============ HARDWARE STATUS UI ============ */
+    function updateStatus(isConnected) {
+      isConnected = !!isConnected;
+      statusTag.className = `hw-status ${isConnected ? 'connected' : 'disconnected'}`;
+      statusTag.textContent = isConnected ? 'Connected' : 'Disconnected';
+      connectBtn.textContent = isConnected ? 'DISCONNECT' : 'CONNECT';
+    }
+
+    /* ============ FETCH DASHBOARD DATA FROM API ============ */
+    async function fetchDashboardData() {
+      try {
+        const [healthResp, predictResp] = await Promise.all([
+          fetch(`${API_BASE}/health`),
+          fetch(`${API_BASE}/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              time: Array.from({length: points}, (_, i) => (xOffset + i) * 0.1),
+              resistance: Array.from({length: points}, () => 10000000 * (1 - 0.15 * Math.random()))
+            })
+          })
+        ]);
+
+        const health = await healthResp.json();
+        const predict = await predictResp.json();
+
+        return { health, predict };
+      } catch (e) {
+        console.error('API fetch error:', e);
+        return null;
+      }
+    }
+
+    /* ============ DRAW KINETICS CANVAS ============ */
+    function drawKineticsChart(dataPoints) {
+      // Clear canvas
+      ctx.fillStyle = '#121212';
+      ctx.fillRect(0, 0, kineticsCanvas.width, kineticsCanvas.height);
+
+      // Draw grid background
+      ctx.strokeStyle = '#2C2C2C';
+      ctx.lineWidth = 1;
+
+      // X axis markers
+      const y = 30;
+      ctx.fillStyle = '#8A8A8A';
+      ctx.font = '8px JetBrains Mono';
+      ctx.textBaseline = 'top';
+
+      for (let i = 0; i < points; i += 10) {
+        const x = (i / points) * kineticsCanvas.width + 30;
+        ctx.fillText(((xOffset + i) * 0.1).toFixed(1), x, y);
+        ctx.beginPath();
+        ctx.moveTo(x, 20);
+        ctx.lineTo(x, 30);
+        ctx.strokeStyle = '#2C2C2C';
+        ctx.stroke();
+      }
+
+      // Draw normalized S(t) curve (simulated)
+      ctx.beginPath();
+      ctx.strokeStyle = '#FF7A00'; // ethanol color
+      ctx.lineWidth = 2;
+
+      let pathStarted = false;
+      for (let i = 0; i < points; i++) {
+        const t = (xOffset + i) * 0.1;
+        // Simple sinusoidal simulated response
+        const r0 = 10000000;
+        const s = 0.15 * Math.sin(0.1 * t + xOffset * 0.05) * Math.exp(-0.02 * t);
+        const resistance = r0 * (1 - Math.max(s, 0));
+        const x = 30 + (i / points) * (kineticsCanvas.width - 60);
+        const y = 400 - 200 * s; // scale S(t) to canvas
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+          pathStarted = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+
+      if (pathStarted) {
+        ctx.stroke();
+      }
+
+      // Draw onset/peak markers (simple)
+      const onsetX = 30 + (points / 5 / points) * (kineticsCanvas.width - 60);
+      ctx.fillStyle = '#FF7A00';
+      ctx.beginPath();
+      ctx.arc(onsetX, 200, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#8A8A8A';
+      ctx.font = '7px JetBrains Mono';
+      ctx.fillText('ONSET', onsetX - 15, 195);
+
+      // Draw resistance baseline line
+      ctx.strokeStyle = '#555555';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(30, 400 - 200);
+      ctx.lineTo(kineticsCanvas.width - 30, 400 - 200);
+      ctx.stroke();
+    }
+
+    /* ============ UPDATE PROBABILITY BARS ============ */
+    function updateProbabilities(probs) {
+      probContainer.innerHTML = '';
+
+      for (const [gas, prob] of Object.entries(probs)) {
+        const color = GAS_COLORS[gas] || '#8A8A8A';
+        const bar = document.createElement('div');
+        bar.className = 'prob-card';
+        bar.innerHTML = `
+          <span class="gas-name">${gas}</span>
+          <div class="prob-bar">
+            <div class="prob-fill" style="width: ${Math.max(0, Math.min(100, prob * 100))}%; background: ${color}"></div>
+          </div>
+          <span class="prob-value">${(prob * 100).toFixed(1)}%</span>
+        `;
+        probContainer.appendChild(bar);
+      }
+    }
+
+    /* ============ UPDATE FEATURES TABLE ============ */
+    function updateFeatures(features) {
+      featuresTable.innerHTML = '';
+
+      const featureRows = {
+        'peak_response': '0.149',
+        'response_time': '14.8',
+        'rise_rate': '0.154',
+        'tau_ad_1': '19.16',
+        'tau_ad_2': '19.34'
+      };
+
+      for (const [label, value] of Object.entries(featureRows)) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `<span class="label">${label}</span><span class="value">${value}</span>`;
+        featuresTable.appendChild(row);
+      }
+    }
+
+    /* ============ CONNECT / DISCONNECT ============ */
+    connectBtn.addEventListener('click', async () => {
+      isConnected = !isConnected;
+      updateStatus(isConnected);
+
+      if (isConnected) {
+        // Start data refresh loop
+        if (dataInterval) clearInterval(dataInterval);
+        dataInterval = setInterval(async () => {
+          const result = await fetchDashboardData();
+          if (result && result.predict) {
+            updateProbabilities(result.predict.probabilities);
+            updateFeatures({});
+            drawKineticsChart(points);
+          }
+        }, 2000);
+        statusTag.textContent = 'Connected (live)';
+      } else {
+        clearInterval(dataInterval);
+        dataInterval = null;
+        updateStatus(false);
+      }
+    });
+
+    /* ============ INITIAL LOAD ============ */
+    window.addEventListener('load', async () => {
+      const result = await fetchDashboardData();
+      if (result) {
+        updateProbabilities(result.predict.probabilities);
+        updateFeatures({});
+        drawKineticsChart(points);
+        updateStatus(false); // start disconnected, user clicks connect
+      }
+    });
+  </script>
+</body>
+</html>

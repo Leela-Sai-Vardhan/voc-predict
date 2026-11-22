@@ -1,0 +1,25 @@
+# Large external datasets and archives
+data_external/
+*.zip
+*.gz
+
+# Python bytecode and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Node modules & frontend builds
+node_modules/
+Dashboard/node_modules/
+Dashboard/dist/
+mlops_dashboard/node_modules/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Scratch and intermediate execution logs
+scratch/
