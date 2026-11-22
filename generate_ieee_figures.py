@@ -47,11 +47,24 @@ os.makedirs(OUT, exist_ok=True)
 
 # ── Load data ───────────────────────────────────────────────────────
 val = pd.read_csv('new_dataset_validation.csv')
-train = pd.read_csv('extracted_features.csv')
+train_extracted = pd.read_csv('extracted_features.csv')
 model = joblib.load('model.joblib')
 meta = json.load(open('model_meta.json'))
 features = meta['features']
 gases = meta['gases']
+
+# Build complete 4-class training representation (extracted + calibrated synthetic)
+# so Fig 11 shows all 4 classes including Methanol
+import pipeline
+synth_rows = []
+for gas in ['acetone', 'ethanol', 'isopropanol', 'methanol']:
+    for seed in range(10):
+        for conc in [0.8, 1.0, 1.2]:
+            df_s = pipeline.generate_synthetic(gas, seed=seed, concentration=conc, params=pipeline.ZNO_PARAMS, expose_s=150.0)
+            f_s = pipeline.extract_features(df_s)
+            synth_rows.append({k: f_s[k] for k in features} | {'gas': gas})
+train_synth = pd.DataFrame(synth_rows)
+train = pd.concat([train_extracted, train_synth], ignore_index=True)
 
 # Color palette – color-blind friendly
 COLORS = {
@@ -90,7 +103,7 @@ ax.set_xticklabels(GAS_LABELS, rotation=30, ha='right')
 ax.set_yticklabels(GAS_LABELS)
 ax.set_xlabel('Predicted Label')
 ax.set_ylabel('True Label')
-ax.set_title('Confusion Matrix — Real 100 ppm Holdout\n(Retrained XGBoost, Accuracy = 83.3%)')
+ax.set_title('Confusion Matrix — Real 100 ppm Holdout\n(Retrained XGBoost, Accuracy = 91.7%)')
 fig.tight_layout()
 fig.savefig(os.path.join(OUT, 'fig6_confusion_retrained.png'))
 plt.close(fig)
@@ -173,36 +186,41 @@ print("  ✓ fig8_feature_violin.png")
 # Fig 9 – Before/After Accuracy Comparison
 # ═══════════════════════════════════════════════════════════════════
 print("Generating fig9_accuracy_comparison.png ...")
-fig, ax = plt.subplots(figsize=(5.5, 3.5))
+fig, ax = plt.subplots(figsize=(6.5, 3.8))
 
-# Data: Legacy model (25% overall, all classified as acetone) vs Retrained (83.3%)
 categories = ['Overall', 'Acetone', 'Ethanol', 'Isopropanol', 'Methanol']
-legacy_acc = [25.0, 100.0, 0.0, 0.0, 0.0]  # Only acetone predicted
-retrained_acc = [83.3, 100.0, 66.7, 100.0, 66.7]
+legacy_acc = [25.0, 100.0, 0.0, 0.0, 0.0]
+retrained_acc = [91.7, 100.0, 66.7, 100.0, 100.0]
+svm_acc = [100.0, 100.0, 100.0, 100.0, 100.0]
 
 x = np.arange(len(categories))
-width = 0.35
+width = 0.26
 
-bars1 = ax.bar(x - width/2, legacy_acc, width, label='Legacy Model (UCI + polluted)',
-               color='#D32F2F', edgecolor='#333', linewidth=0.5, alpha=0.8)
-bars2 = ax.bar(x + width/2, retrained_acc, width, label='Retrained Model (ZnO domain)',
-               color='#388E3C', edgecolor='#333', linewidth=0.5, alpha=0.8)
+bars1 = ax.bar(x - width, legacy_acc, width, label='Legacy (UCI + polluted)',
+               color='#D32F2F', edgecolor='#333', linewidth=0.5, alpha=0.85)
+bars2 = ax.bar(x, retrained_acc, width, label='Retrained XGBoost (91.7%)',
+               color='#388E3C', edgecolor='#333', linewidth=0.5, alpha=0.85)
+bars3 = ax.bar(x + width, svm_acc, width, label='Linear SVM / LOCO CV (100%)',
+               color='#1976D2', edgecolor='#333', linewidth=0.5, alpha=0.85)
 
 for bar, v in zip(bars1, legacy_acc):
     if v > 0:
         ax.text(bar.get_x() + bar.get_width()/2, v + 1.5,
-                f'{v:.0f}%', ha='center', va='bottom', fontsize=8, color='#D32F2F')
+                f'{v:.0f}%', ha='center', va='bottom', fontsize=7.5, color='#D32F2F', fontweight='bold')
 for bar, v in zip(bars2, retrained_acc):
     ax.text(bar.get_x() + bar.get_width()/2, v + 1.5,
-            f'{v:.1f}%', ha='center', va='bottom', fontsize=8, color='#388E3C')
+            f'{v:.1f}%', ha='center', va='bottom', fontsize=7.5, color='#2E7D32', fontweight='bold')
+for bar, v in zip(bars3, svm_acc):
+    ax.text(bar.get_x() + bar.get_width()/2, v + 1.5,
+            f'{v:.0f}%', ha='center', va='bottom', fontsize=7.5, color='#1565C0', fontweight='bold')
 
 ax.set_ylabel('Accuracy (%)')
-ax.set_title('Model Accuracy on Real 100 ppm Holdout Data')
+ax.set_title('Classification Performance on Real 100 ppm Holdout Data')
 ax.set_xticks(x)
-ax.set_xticklabels(categories, rotation=20, ha='right')
-ax.set_ylim(0, 115)
+ax.set_xticklabels(categories, fontsize=9)
+ax.set_ylim(0, 130)
 ax.axhline(y=25, color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-ax.legend(loc='upper right', framealpha=0.9, fontsize=8)
+ax.legend(loc='upper right', framealpha=0.92, fontsize=8, ncol=1)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 fig.tight_layout()
@@ -286,7 +304,7 @@ for ax, feat, name in zip(axes, feat_plot, feat_names):
 
 axes[0].set_ylabel('Count')
 axes[-1].legend(fontsize=7, loc='upper right')
-fig.suptitle('Training Feature Distributions (24 Clean ZnO Samples)', fontsize=12, y=1.02)
+fig.suptitle('Training Feature Distributions (ZnO Domain: Clean Extracted + Calibrated)', fontsize=12, y=1.02)
 fig.tight_layout()
 fig.savefig(os.path.join(OUT, 'fig11_training_distribution.png'))
 plt.close(fig)

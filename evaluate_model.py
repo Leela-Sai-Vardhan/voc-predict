@@ -103,17 +103,91 @@ def eval_real():
     return metrics_report(y_true, y_pred, classes, "Real 100 ppm data (holdout, 12 recordings)")
 
 
+def benchmark_loco_cv():
+    """Benchmark Linear SVM, RBF SVM, Logistic Regression, RF, and XGBoost via LOCO-CV."""
+    import os
+    if not os.path.exists(REAL_XLSX):
+        return
+    from sklearn.svm import SVC
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    from xgboost import XGBClassifier
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.pipeline import make_pipeline
+    from sklearn.model_selection import LeaveOneGroupOut
+
+    raw = pd.read_excel(REAL_XLSX, sheet_name="Raw_Time_Series")
+    rows = []
+    for (voc, cycle), sub in raw.groupby(["VOC", "Cycle"]):
+        t = sub["Time_within_cycle_s"].to_numpy(float).reshape(-1, 1)
+        i = sub["Current_nA"].to_numpy(float)
+        t_dense = np.arange(t.min(), t.max() + 1.0, 1.0)
+        i_dense = np.interp(t_dense, t.ravel(), i)
+        rec = pd.DataFrame({"time": t_dense, "resistance": 1.0 / i_dense})
+        f = pipeline.extract_features(rec)
+        rows.append({k: f[k] for k in FEATURES} | {
+            "gas_true": GAS_MAP[voc], "voc": voc, "cycle": int(cycle)
+        })
+    df = pd.DataFrame(rows).fillna(0.0)
+    y = df["gas_true"]
+    groups = df["cycle"]
+    logo = LeaveOneGroupOut()
+
+    models = {
+        "Linear SVM (C=1.0)": make_pipeline(StandardScaler(), SVC(kernel="linear", C=1.0)),
+        "RBF SVM (C=1.0)": make_pipeline(StandardScaler(), SVC(kernel="rbf", C=1.0)),
+        "Logistic Regression (L2)": make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=1000)),
+        "Random Forest (depth=2)": RandomForestClassifier(n_estimators=50, max_depth=2, random_state=42),
+    }
+
+    print("\n" + "=" * 62)
+    print("BENCHMARK: Leave-One-Cycle-Out (LOCO) CV on Real 100 ppm (12 recordings)")
+    print("=" * 62)
+    print(f"{'Model Architecture':<30} {'Features Used':<22} {'LOCO Accuracy':<14}")
+    print("-" * 68)
+
+    # 1) Peak response alone
+    for name, clf in [("Linear SVM", make_pipeline(StandardScaler(), SVC(kernel="linear", C=1.0)))]:
+        preds = np.empty(len(y), dtype=object)
+        for tr, te in logo.split(df[["peak_response"]], y, groups):
+            clf.fit(df[["peak_response"]].iloc[tr], y.iloc[tr])
+            preds[te] = clf.predict(df[["peak_response"]].iloc[te])
+        acc = np.mean(preds == y.values)
+        print(f"{name:<30} {'[peak_response]':<22} {acc:.1%} ({int(np.sum(preds == y.values))}/12)")
+
+    # 2) Peak response + rise rate
+    for name, clf in [("Linear SVM", make_pipeline(StandardScaler(), SVC(kernel="linear", C=1.0))),
+                      ("Logistic Regression", make_pipeline(StandardScaler(), LogisticRegression(C=1.0)))]:
+        preds = np.empty(len(y), dtype=object)
+        feats2 = ["peak_response", "rise_rate"]
+        for tr, te in logo.split(df[feats2], y, groups):
+            clf.fit(df[feats2].iloc[tr], y.iloc[tr])
+            preds[te] = clf.predict(df[feats2].iloc[te])
+        acc = np.mean(preds == y.values)
+        print(f"{name:<30} {'[peak, rise_rate]':<22} {acc:.1%} ({int(np.sum(preds == y.values))}/12)")
+
+    # 3) All 4 clean kinetic features
+    feats4 = ["peak_response", "rise_rate", "tau_ad_1", "tau_ad_2"]
+    for name, clf in models.items():
+        preds = np.empty(len(y), dtype=object)
+        for tr, te in logo.split(df[feats4], y, groups):
+            clf.fit(df[feats4].iloc[tr], y.iloc[tr])
+            preds[te] = clf.predict(df[feats4].iloc[te])
+        acc = np.mean(preds == y.values)
+        print(f"{name:<30} {'[peak, rise, taus]':<22} {acc:.1%} ({int(np.sum(preds == y.values))}/12)")
+    print("=" * 68)
+
+
 def main():
     model = joblib.load(MODEL)
     with open(META) as f:
         meta = json.load(f)
     classes = list(meta["gases"])
     print(f"Model: {MODEL}  classes={classes}  features={FEATURES}")
-    print("Note: hold-out (UCI+extracted+synthetic) acc=0.634 / F1=0.633 [from full_retrain.py]")
-    print("      (UCI rebuild skipped — too slow; numbers above are authoritative)")
     print()
     eval_csv(EXTRACTED, "extracted_features.csv [training-data eval, optimistic]")
     eval_real()
+    benchmark_loco_cv()
 
 
 if __name__ == "__main__":

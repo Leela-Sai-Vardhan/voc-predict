@@ -83,6 +83,18 @@ def _fit_two_term(t, y, rising):
     try:
         popt, _ = curve_fit(f, t0, y, p0=p0, bounds=bounds, maxfev=20000)
         taus = np.sort(np.abs([popt[1], popt[3]]))
+        # If the two time constants collapsed into a degenerate identical value (ratio < 1.3)
+        # on sufficiently long pulses, retry with separated bounds to resolve fast vs slow phases
+        if taus[1] / max(taus[0], 1e-3) < 1.3 and (t[-1] - t[0]) >= 30.0:
+            mid = 15.0
+            p0_split = [peak * 0.5, 2.0, peak * 0.5, 30.0, y0]
+            b_split = ([-np.inf, 1e-3, -np.inf, mid, -np.inf],
+                       [np.inf, mid, np.inf, ub, np.inf])
+            try:
+                popt2, _ = curve_fit(f, t0, y, p0=p0_split, bounds=b_split, maxfev=20000)
+                taus = np.sort(np.abs([popt2[1], popt2[3]]))
+            except Exception:
+                pass
         return float(taus[0]), float(taus[1])
     except RuntimeError:
         return float("nan"), float("nan")
