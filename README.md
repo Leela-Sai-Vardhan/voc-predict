@@ -52,7 +52,10 @@ voc-predict/
 ├── data sets/                  # In-repo experimental sensor data
 │   ├── Train/                  # Data Set.xlsx (multi-pulse laboratory recordings)
 │   └── new/                    # ZnO_VOC_Feature_Extraction_100ppm.xlsx (12 real holdouts)
-├── figures/                    # Publication figures (fig1-12, visual1-3)
+├── figures/                    # Publication visual assets
+│   ├── ieee/                   # Camera-ready IEEE figures (fig1-7, 300 DPI rectangular standard)
+│   ├── old/                    # Archived preliminary, exploratory, and review assets
+│   └── README.md               # Complete figure guide & LaTeX tagging reference
 ├── docs/                       # Project documentation & laboratory protocols
 │   ├── LAB_PROTOCOL.md         # Standard operating procedure (SOP) for sensor collection
 │   └── reference/              # Reference dataset cards (BME688 specification)
@@ -93,7 +96,7 @@ python evaluate_model.py
 ```
 
 ### 4. Generate IEEE Publication Figures
-Produces all 7 camera-ready 300 DPI PNG figures in `figures/`:
+Produces all 7 camera-ready 300 DPI PNG figures in `figures/ieee/`:
 ```bash
 python generate_ieee_figures.py
 ```

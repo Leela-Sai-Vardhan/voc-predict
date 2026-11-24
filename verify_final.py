@@ -38,11 +38,13 @@ for fname in ['segment_and_extract.py', 'extracted_features.csv', 'model.joblib'
     size = os.path.getsize(fname) if exists else 0
     print(f'  {fname}: {"OK" if exists else "MISSING"} ({size:,} bytes)')
 print()
-print('=== FIGURES ===')
-if os.path.isdir('figures'):
-    for fn in sorted(os.listdir('figures')):
-        fp = os.path.join('figures', fn)
-        print(f'  {fn}: {os.path.getsize(fp):,} bytes')
+print('=== FIGURES (IEEE Camera-Ready) ===')
+ieee_dir = os.path.join('figures', 'ieee')
+if os.path.isdir(ieee_dir):
+    for fn in sorted(os.listdir(ieee_dir)):
+        fp = os.path.join(ieee_dir, fn)
+        if os.path.isfile(fp):
+            print(f'  {fn}: {os.path.getsize(fp):,} bytes')
 print()
 print('=== EXTRACTED FEATURES ===')
 ef = pd.read_csv('extracted_features.csv')

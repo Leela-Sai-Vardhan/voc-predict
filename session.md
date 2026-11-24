@@ -133,6 +133,29 @@ To improve maintainability and clean up clutter without disrupting operational w
 
 ---
 
+## Figure Standardization & Segregation (Old vs. IEEE Camera-Ready Suite)
+
+To eliminate confusion between historical exploratory figures and camera-ready paper deliverables:
+
+1. **Segregated Figure Hierarchy (`figures/`)**:
+   * **`figures/ieee/`**: Holds strictly camera-ready, standardized 300 DPI figures numbered sequentially for paper drafting:
+     * `fig1_transient_responses.png`: Conduction current $I(t)$ and normalized response $S(t)$ across 4 gases.
+     * `fig2_feature_boxplots.png`: **Rectangular box plots** ($S_{\max}, dS/dt, \tau_1, \tau_2$) replacing wavy violin plots.
+     * `fig3_feature_scatter.png`: 2D feature projections showing physical cluster separation.
+     * `fig4_feature_importance.png`: XGBoost feature split gain ranking ($dS/dt = 47.3\%$).
+     * `fig5_confusion_matrix.png`: 4×4 confusion matrix on real 100 ppm holdout (91.7% accuracy).
+     * `fig6_accuracy_comparison.png`: Architectural progression (Legacy 25% → XGBoost 91.7% → Linear SVM 100%).
+     * `fig7_confidence_analysis.png`: Prediction confidence markers across cycles.
+   * **`figures/old/`**: Archived all 15 preliminary, exploratory, and review presentation visuals (`fig1-12`, `visual1-3`).
+   * **`figures/README.md`**: Added a detailed LaTeX tagging guide with captions and recommended paper sections.
+
+2. **Standardization of Fig. 2 (Rectangular Box Plots vs. Violins)**:
+   * Replaced the wavy, KDE-interpolated violin plots with clean rectangular boxplots matching the `fig2` format.
+   * Format: rectangular boxes (`widths=0.52`), crisp black borders (`lw=1.0`), solid black median lines (`lw=1.6`), whisker bounds, and overlaid discrete cycle measurements ($n=3$ per gas).
+   * Follows strict IEEE Transactions styling (Times New Roman serif, Okabe-Ito color-blind friendly palette).
+
+---
+
 ## Next Steps
 1. Optionally adopt `norm_slope` as a 6th model feature (add to `train.FEATURES`, regenerate all CSVs, retrain).
 2. Verify `api/main.py` and React Dashboard predictions against the new model artifacts.
