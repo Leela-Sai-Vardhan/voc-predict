@@ -25,7 +25,7 @@ differ per gas. The project:
 5. Feeds those 5 features to XGBoost / RandomForest.
 
 The physics story (n-type ZnO, reducing VOC → resistance drops) is described in
-`laborator_README.md` for the synthetic-data dataset.
+`docs/reference/laborator_bme688_spec.md` for the synthetic-data dataset.
 
 ---
 
@@ -142,7 +142,7 @@ feature (Golden Rule 5). Adopt it at the next retrain by adding `norm_slope` to
   from the real 100 ppm ZnO recordings — `smax` 0.191–0.306, slow `ta` ≈ 29–37 s).
   Use `generate_synthetic(gas, params=ZNO_PARAMS)`. The slow `ta` needs
   `expose_s >= 120` to resolve cleanly; the default `expose_s=40` truncates it.
-- Dataset card / physics model: `laborator_README.md`.
+- Dataset card / physics model: `docs/reference/laborator_bme688_spec.md`.
 
 ---
 
@@ -195,12 +195,11 @@ model.joblib              Trained model (joblib)
 model_meta.json           Feature list + class list for the saved model
 extracted_features.csv    Cached features from Data Set.xlsx (24 rows)
 uci1081/gsalc.csv         UCI 1081 raw CSV
-uci1081.zip               Raw UCI download
 data sets/                Own sensor measurements (Excel)
 Literature Survey/        Background PPTX/DOCX
-figures/                  Generated PNGs (report + review visuals)
-laborator_README.md       Dataset card for the synthetic MOX dataset
-page.html                 Cached UCI dataset page (artifact, not source)
+figures/                  Generated PNGs (report + IEEE figures + review visuals)
+docs/                     Lab protocol and reference documentation
+tools/                    Data fetch utilities, archive prototypes, scratch
 ```
 
 ---
@@ -208,11 +207,11 @@ page.html                 Cached UCI dataset page (artifact, not source)
 ## 8. Reproduce
 
 ```bash
-pip install numpy pandas scipy scikit-learn xgboost joblib matplotlib openpyxl requests
+pip install -r requirements.txt
 ```
 
 ```bash
-python dl_1081.py            # fetch UCI 1081 (if uci1081/ is missing)
+python tools/data_fetch/dl_1081.py   # fetch UCI 1081 (if uci1081/ is missing)
 python train.py              # 3-class baseline, prints grouped CV acc/F1
 python segment_and_extract.py# Data Set.xlsx -> extracted_features.csv
 python full_retrain.py       # final 4-class model -> model.joblib

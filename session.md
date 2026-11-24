@@ -115,6 +115,24 @@ space-delimited with a UTF-8 BOM (`encoding='utf-8-sig', delimiter=r'\s+'`,
 
 ---
 
+## Repository Organization & Documentation Consolidation (Completed)
+
+To improve maintainability and clean up clutter without disrupting operational workflows:
+
+1. **Unified Root `README.md`**: Created a master repository README containing executive architecture summary, multi-model benchmark results, quickstart, directory layout, and documentation index.
+2. **Documentation Restructuring (`docs/`)**:
+   * Moved `lab-session.md` to `docs/LAB_PROTOCOL.md` (experimental SOP).
+   * Moved `laborator_README.md` to `docs/reference/laborator_bme688_spec.md` (HuggingFace BME688 reference card).
+   * Kept `ARCHITECTURE.md` and `session.md` at root for direct technical traceability.
+3. **Utility & Scratch Segregation (`tools/`)**:
+   * One-off crawl/download scripts (`dl_1081.py`, `dl_probe.py`, `list_files.py`) moved to `tools/data_fetch/`.
+   * Obsolete prototype (`integrate_new_data.py`) moved to `tools/archive/`.
+   * Crawl dumps and temporary execution logs (`page.html`, `graphify_output.txt`) moved to `tools/scratch/` and git-ignored.
+   * Root `uci1081.zip` moved to `uci1081/archive/`.
+4. **Verification**: Executed `verify_final.py`, `pipeline.py`, `evaluate_model.py`, `validate_new_dataset.py`, and `generate_ieee_figures.py` to confirm zero regression across all operational workflows.
+
+---
+
 ## Next Steps
 1. Optionally adopt `norm_slope` as a 6th model feature (add to `train.FEATURES`, regenerate all CSVs, retrain).
 2. Verify `api/main.py` and React Dashboard predictions against the new model artifacts.
